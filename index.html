@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="./resources/ol.css">
+        <link rel="stylesheet" href="resources/fontawesome-all.min.css">
+        <link href="resources/photon-geocoder-autocomplete.min.css" rel="stylesheet">
+        <link rel="stylesheet" href="./resources/ol-layerswitcher.css">
+        <link rel="stylesheet" href="./resources/qgis2web.css">
+        <style>
+        :root {
+            --ink: #17221f;
+            --muted: #65736f;
+            --panel: rgba(255, 255, 255, 0.92);
+            --panel-strong: #ffffff;
+            --line: rgba(30, 48, 42, 0.14);
+            --green: #1f6f4a;
+            --green-dark: #0d3d2b;
+            --sand: #f4efe5;
+            --shadow: 0 24px 70px rgba(14, 35, 29, 0.22);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+            background:
+                radial-gradient(circle at top left, rgba(88, 151, 108, 0.28), transparent 34rem),
+                linear-gradient(135deg, #eef4ec 0%, #f7f1e7 48%, #dce9e1 100%);
+            color: var(--ink);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+        }
+
+        body {
+            overflow: hidden;
+        }
+
+        .geoportal {
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            gap: 18px;
+            height: 100%;
+            min-height: 100%;
+            padding: 22px;
+        }
+
+        .site-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 18px;
+            padding: 18px 22px;
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.94), rgba(245,249,244,0.82));
+            box-shadow: 0 18px 50px rgba(16, 41, 33, 0.12);
+            backdrop-filter: blur(18px);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            display: grid;
+            place-items: center;
+            width: 48px;
+            height: 48px;
+            flex: 0 0 auto;
+            border-radius: 16px;
+            background: linear-gradient(135deg, var(--green), #79a85b);
+            color: #fff;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            box-shadow: 0 12px 30px rgba(31, 111, 74, 0.32);
+        }
+
+        .eyebrow {
+            margin: 0 0 4px;
+            color: var(--green);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(1.45rem, 2.6vw, 2.25rem);
+            line-height: 1.05;
+        }
+
+        .header-meta {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .pill {
+            padding: 9px 13px;
+            border: 1px solid rgba(31, 111, 74, 0.18);
+            border-radius: 999px;
+            background: rgba(255,255,255,0.76);
+            color: var(--green-dark);
+            font-size: 0.82rem;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+            gap: 18px;
+            min-height: 0;
+        }
+
+        .sidebar,
+        .map-card {
+            border: 1px solid var(--line);
+            border-radius: 30px;
+            background: var(--panel);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+        }
+
+        .sidebar {
+            min-height: 0;
+            overflow: auto;
+            padding: 20px;
+        }
+
+        .section-label {
+            margin: 0 0 8px;
+            color: var(--green);
+            font-size: 0.72rem;
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .lead {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.96rem;
+            line-height: 1.55;
+        }
+
+        .info-card {
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            background: var(--panel-strong);
+        }
+
+        .info-card + .info-card {
+            margin-top: 14px;
+        }
+
+        .info-card h2 {
+            margin: 0 0 10px;
+            font-size: 1rem;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .stat {
+            padding: 14px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #edf6ef, #fff9ec);
+        }
+
+        .stat strong {
+            display: block;
+            font-size: 1.18rem;
+        }
+
+        .stat span {
+            color: var(--muted);
+            font-size: 0.78rem;
+        }
+
+        .legend-list {
+            display: grid;
+            gap: 9px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .legend-list li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 10px;
+            border-radius: 14px;
+            background: #f7faf6;
+            color: #26332f;
+            font-size: 0.88rem;
+        }
+
+        .legend-list img {
+            width: 20px;
+            height: 20px;
+            object-fit: contain;
+            flex: 0 0 auto;
+        }
+
+        .map-card {
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            min-width: 0;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .map-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 15px 18px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(255,255,255,0.82);
+        }
+
+        .map-toolbar h2 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .map-toolbar p {
+            margin: 3px 0 0;
+            color: var(--muted);
+            font-size: 0.82rem;
+        }
+
+        .status-badge {
+            padding: 9px 12px;
+            border-radius: 999px;
+            background: #e8f4ea;
+            color: var(--green-dark);
+            font-size: 0.82rem;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .map-shell {
+            position: relative;
+            min-height: 0;
+            padding: 14px;
+            background:
+                linear-gradient(135deg, rgba(13, 61, 43, 0.08), transparent 42%),
+                var(--sand);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            min-height: 420px;
+            overflow: hidden;
+            border: 1px solid rgba(13, 61, 43, 0.16);
+            border-radius: 24px;
+            background: #edf2ec;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.56);
+        }
+
+        .ol-control {
+            background-color: rgba(255,255,255,.64) !important;
+            border-radius: 16px !important;
+            padding: 4px !important;
+            box-shadow: 0 14px 36px rgba(20, 40, 34, 0.18) !important;
+            backdrop-filter: blur(12px);
+        }
+
+        .ol-control > * {
+            min-width: 30px;
+            min-height: 30px;
+            border: 0 !important;
+            border-radius: 12px !important;
+            background-color: #ffffff !important;
+            color: var(--green-dark) !important;
+            font-weight: 800 !important;
+        }
+
+        .ol-control > *:focus,
+        .ol-control >*:hover {
+            background-color: #e8f4ea !important;
+        }
+
+        .ol-attribution a,
+        .gcd-gl-input::placeholder,
+        .search-layer-input-search::placeholder {
+            color: #444444!important;
+        }
+
+        .search-layer-input-search {
+            background-color: #ffffff!important;
+            border-radius: 12px !important;
+        }
+
+        .layer-switcher {
+            border-radius: 18px !important;
+        }
+
+        .layer-switcher.shown {
+            max-width: min(340px, calc(100vw - 48px));
+        }
+
+        .layer-switcher .panel {
+            border-radius: 18px !important;
+            color: var(--ink);
+        }
+
+        .ol-popup {
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            box-shadow: 0 20px 56px rgba(14,35,29,0.24);
+        }
+
+        @media (max-width: 980px) {
+            body {
+                overflow: auto;
+            }
+
+            .geoportal {
+                min-height: 100vh;
+                padding: 14px;
+            }
+
+            .site-header,
+            .layout,
+            .map-toolbar {
+                grid-template-columns: 1fr;
+            }
+
+            .site-header,
+            .map-toolbar {
+                align-items: flex-start;
+            }
+
+            .layout {
+                display: grid;
+            }
+
+            .header-meta {
+                justify-content: flex-start;
+            }
+
+            .sidebar {
+                max-height: none;
+            }
+
+            .map-card {
+                min-height: 70vh;
+            }
+
+            #map {
+                min-height: 520px;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .brand {
+                align-items: flex-start;
+            }
+
+            .brand-mark {
+                width: 42px;
+                height: 42px;
+                border-radius: 14px;
+            }
+
+            .stat-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .pill,
+            .status-badge {
+                white-space: normal;
+            }
+
+            .map-shell {
+                padding: 8px;
+            }
+
+            #map {
+                border-radius: 18px;
+                min-height: 480px;
+            }
+        }
+        </style>
+        <title>Géoportail d'occupation du sol 2015</title>
+    </head>
+    <body>
+        <div class="geoportal">
+            <header class="site-header" aria-label="En-tête du géoportail">
+                <div class="brand">
+                    <div class="brand-mark" aria-hidden="true">OS</div>
+                    <div>
+                        <p class="eyebrow">Géoportail thématique</p>
+                        <h1>Carte d'occupation du sol 2015</h1>
+                    </div>
+                </div>
+                <div class="header-meta" aria-label="Informations rapides">
+                    <span class="pill">Occupation du sol</span>
+                    <span class="pill">Commune et réseau routier</span>
+                    <span class="pill">Données interactives</span>
+                </div>
+            </header>
+
+            <main class="layout">
+                <aside class="sidebar" aria-label="Informations et légende">
+                    <section class="info-card">
+                        <p class="section-label">Vue d'ensemble</p>
+                        <h2>Lecture rapide du territoire</h2>
+                        <p class="lead">Explorez les classes d'occupation, les limites communales et les axes routiers. Cliquez sur les entités de la carte pour consulter les attributs disponibles.</p>
+                        <div class="stat-grid" aria-label="Résumé des couches">
+                            <div class="stat"><strong>8</strong><span>classes d'occupation</span></div>
+                            <div class="stat"><strong>4</strong><span>couches visibles</span></div>
+                        </div>
+                    </section>
+
+                    <section class="info-card">
+                        <p class="section-label">Légende</p>
+                        <h2>Occupation du sol</h2>
+                        <ul class="legend-list">
+                            <li><img src="styles/legend/Classification2015_0_0.png" alt=""> Mangroves</li>
+                            <li><img src="styles/legend/Classification2015_0_1.png" alt=""> Plan d'eau</li>
+                            <li><img src="styles/legend/Classification2015_0_2.png" alt=""> Sol nu</li>
+                            <li><img src="styles/legend/Classification2015_0_3.png" alt=""> Culture et jachère</li>
+                            <li><img src="styles/legend/Classification2015_0_4.png" alt=""> Savane marécageuse</li>
+                            <li><img src="styles/legend/Classification2015_0_5.png" alt=""> Habitations</li>
+                            <li><img src="styles/legend/Classification2015_0_6.png" alt=""> Forêt dense</li>
+                            <li><img src="styles/legend/Classification2015_0_7.png" alt=""> Savane arborée / arbustive</li>
+                        </ul>
+                    </section>
+
+                    <section class="info-card">
+                        <p class="section-label">Repères</p>
+                        <h2>Réseaux et limites</h2>
+                        <ul class="legend-list">
+                            <li><img src="styles/legend/Routesecondaire_1.png" alt=""> Route secondaire</li>
+                            <li><img src="styles/legend/Limitecommune_2.png" alt=""> Limite commune</li>
+                            <li><img src="styles/legend/ROUTE_3_0.png" alt=""> Route nationale RNIE</li>
+                        </ul>
+                    </section>
+                </aside>
+
+                <section class="map-card" aria-label="Carte interactive">
+                    <div class="map-toolbar">
+                        <div>
+                            <h2>Carte interactive</h2>
+                            <p>Utilisez le zoom, le sélecteur de couches et les popups pour analyser les données.</p>
+                        </div>
+                        <span class="status-badge">Couches originales conservées</span>
+                    </div>
+                    <div class="map-shell">
+                        <div id="map">
+                            <div id="popup" class="ol-popup">
+                                <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+                                <div id="popup-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+        <script src="resources/qgis2web_expressions.js"></script>
+        <script src="./resources/functions.js"></script>
+        <script src="./resources/ol.js"></script>
+        <script src="./resources/ol-layerswitcher.js"></script>
+        <script src="resources/photon-geocoder-autocomplete.min.js"></script>
+        <script src="resources/olms.js"></script>
+        <script src="layers/Classification2015_0.js"></script>
+        <script>
+        (async function loadGeoportal() {
+            function loadScript(src) {
+                return new Promise(function(resolve, reject) {
+                    var script = document.createElement('script');
+                    script.src = src;
+                    script.onload = resolve;
+                    script.onerror = function() { reject(new Error('Impossible de charger ' + src)); };
+                    document.body.appendChild(script);
+                });
+            }
+
+            await window.loadClassification2015_0();
+            await loadScript('layers/Routesecondaire_1.js');
+            await loadScript('layers/Limitecommune_2.js');
+            await loadScript('layers/ROUTE_3.js');
+            await loadScript('styles/Classification2015_0_style.js');
+            await loadScript('styles/Routesecondaire_1_style.js');
+            await loadScript('styles/Limitecommune_2_style.js');
+            await loadScript('styles/ROUTE_3_style.js');
+            await loadScript('./layers/layers.js');
+            await loadScript('./resources/Autolinker.min.js');
+            await loadScript('./resources/qgis2web.js');
+        })().catch(function(error) {
+            console.error(error);
+            alert("La carte n'a pas pu charger la couche d'occupation compressée.");
+        });
+        </script>        
+    </body>
+</html>
