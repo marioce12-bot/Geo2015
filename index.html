@@ -3,7 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <link rel="stylesheet" href="./resources/ol.css">
@@ -264,6 +264,7 @@
 
         .map-shell {
             position: relative;
+            height: 100%;
             min-height: 0;
             padding: 14px;
             background:
@@ -341,45 +342,78 @@
             }
 
             .geoportal {
-                min-height: 100vh;
+                height: auto;
+                min-height: 100dvh;
                 padding: 14px;
             }
 
-            .site-header,
-            .layout,
-            .map-toolbar {
-                grid-template-columns: 1fr;
-            }
-
-            .site-header,
-            .map-toolbar {
+            .site-header {
+                flex-direction: column;
                 align-items: flex-start;
+                padding: 16px;
+                border-radius: 24px;
             }
 
             .layout {
                 display: grid;
+                grid-template-columns: 1fr;
+                gap: 14px;
+            }
+
+            .map-card {
+                order: 1;
+                min-height: auto;
+                border-radius: 24px;
+            }
+
+            .sidebar {
+                order: 2;
+                max-height: none;
+                overflow: visible;
+                padding: 14px;
+                border-radius: 24px;
+            }
+
+            .map-toolbar {
+                flex-direction: column;
+                align-items: flex-start;
             }
 
             .header-meta {
                 justify-content: flex-start;
             }
 
-            .sidebar {
-                max-height: none;
-            }
-
-            .map-card {
-                min-height: 70vh;
+            .map-shell {
+                height: 68dvh;
+                min-height: 430px;
+                max-height: 680px;
             }
 
             #map {
-                min-height: 520px;
+                height: 100%;
+                min-height: 0;
+            }
+
+            .layer-switcher.shown {
+                max-width: calc(100vw - 36px);
             }
         }
 
         @media (max-width: 560px) {
+            .geoportal {
+                gap: 10px;
+                padding: 10px;
+            }
+
+            .site-header {
+                gap: 12px;
+                padding: 14px;
+                border-radius: 20px;
+            }
+
             .brand {
                 align-items: flex-start;
+                gap: 10px;
             }
 
             .brand-mark {
@@ -388,8 +422,40 @@
                 border-radius: 14px;
             }
 
+            h1 {
+                font-size: 1.25rem;
+            }
+
+            .eyebrow {
+                font-size: 0.64rem;
+            }
+
+            .header-meta {
+                display: none;
+            }
+
+            .map-toolbar {
+                gap: 8px;
+                padding: 12px;
+            }
+
+            .map-toolbar p {
+                font-size: 0.78rem;
+                line-height: 1.35;
+            }
+
             .stat-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .info-card {
+                padding: 14px;
+                border-radius: 18px;
+            }
+
+            .legend-list li {
+                padding: 8px;
+                font-size: 0.82rem;
             }
 
             .pill,
@@ -398,12 +464,28 @@
             }
 
             .map-shell {
+                height: 66dvh;
+                min-height: 380px;
                 padding: 8px;
             }
 
             #map {
                 border-radius: 18px;
-                min-height: 480px;
+            }
+
+            .ol-control > * {
+                min-width: 28px;
+                min-height: 28px;
+            }
+
+            .ol-popup {
+                max-width: calc(100vw - 32px);
+                padding: 12px;
+            }
+
+            #popup-content {
+                max-width: calc(100vw - 64px);
+                max-height: 50dvh;
             }
         }
         </style>
