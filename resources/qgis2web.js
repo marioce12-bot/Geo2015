@@ -15,6 +15,7 @@ map.getView().fit([177827.445877, 692326.304082, 221828.630720, 719593.493865], 
 map.getView().setProperties({constrainResolution: true});
 
 //change cursor
+var enablePointerHover = false;
 function pointerOnFeature(evt) {
     if (evt.dragging) {
         return;
@@ -26,7 +27,9 @@ function pointerOnFeature(evt) {
     });
     map.getViewport().style.cursor = hasFeature ? "pointer" : "";
 }
-map.on('pointermove', pointerOnFeature);
+if (enablePointerHover) {
+    map.on('pointermove', pointerOnFeature);
+}
 function styleCursorMove() {
     map.on('pointerdrag', function() {
         map.getViewport().style.cursor = "move";
@@ -148,7 +151,7 @@ var featureOverlay = new ol.layer.Vector({
 });
 
 var doHighlight = false;
-var doHover = true;
+var doHover = false;
 
 function createPopupField(currentFeature, currentFeatureKeys, layer) {
     var popupText = '';
