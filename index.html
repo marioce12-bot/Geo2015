@@ -571,7 +571,6 @@
         <script src="./resources/ol-layerswitcher.js"></script>
         <script src="resources/photon-geocoder-autocomplete.min.js"></script>
         <script src="resources/olms.js"></script>
-        <script src="layers/Classification2015_0.js"></script>
         <script>
         (async function loadGeoportal() {
             function loadScript(src) {
@@ -583,12 +582,9 @@
                     document.body.appendChild(script);
                 });
             }
-
-            await window.loadClassification2015_0();
             await loadScript('layers/Routesecondaire_1.js');
             await loadScript('layers/Limitecommune_2.js');
             await loadScript('layers/ROUTE_3.js');
-            await loadScript('styles/Classification2015_0_style.js');
             await loadScript('styles/Routesecondaire_1_style.js');
             await loadScript('styles/Limitecommune_2_style.js');
             await loadScript('styles/ROUTE_3_style.js');
@@ -597,7 +593,7 @@
             await loadScript('./resources/qgis2web.js');
         })().catch(function(error) {
             console.error(error);
-            alert("La carte n'a pas pu charger la couche d'occupation compressée.");
+            alert("La carte n'a pas pu charger toutes les ressources.");
         });
         </script>        
     </body>

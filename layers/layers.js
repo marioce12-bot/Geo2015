@@ -1,18 +1,13 @@
 var wms_layers = [];
 
-var format_Classification2015_0 = new ol.format.GeoJSON();
-var features_Classification2015_0 = format_Classification2015_0.readFeatures(json_Classification2015_0, 
-            {dataProjection: 'EPSG:4326', featureProjection: 'EPSG:3857'});
-var jsonSource_Classification2015_0 = new ol.source.Vector({
-    attributions: ' ',
-});
-jsonSource_Classification2015_0.addFeatures(features_Classification2015_0);
-var lyr_Classification2015_0 = new ol.layer.Vector({
-                declutter: false,
-                source:jsonSource_Classification2015_0, 
-                style: style_Classification2015_0,
+var lyr_Classification2015_0 = new ol.layer.Image({
+                source: new ol.source.ImageStatic({
+                    url: 'images/classification2015.webp',
+                    imageExtent: [186249.600066, 693858.162100, 228294.723069, 721117.786032],
+                    projection: 'EPSG:3857'
+                }),
                 popuplayertitle: 'Classification 2015',
-                interactive: true,
+                interactive: false,
     title: 'Classification 2015<br />\
     <img src="styles/legend/Classification2015_0_0.png" /> Mangroves<br />\
     <img src="styles/legend/Classification2015_0_1.png" /> Plan d\'eau<br />\
