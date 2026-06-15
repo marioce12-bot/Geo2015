@@ -759,6 +759,58 @@
                 padding: 7px 10px;
             }
         }
+        .site-header {
+            position: static;
+            align-items: center;
+            flex-wrap: wrap;
+            padding: 12px 16px;
+        }
+
+        .geoportal {
+            padding-top: 22px;
+        }
+
+        .brand-mark {
+            width: 42px;
+            height: 42px;
+            border-radius: 14px;
+        }
+
+        h1 {
+            font-size: clamp(1.2rem, 2vw, 1.7rem);
+        }
+
+        .header-meta,
+        .tool-status {
+            display: none;
+        }
+
+        .header-tools {
+            flex: 1 1 520px;
+            max-width: none;
+            padding: 10px;
+        }
+
+        @media (max-width: 980px) {
+            .site-header {
+                max-height: none;
+                overflow: visible;
+            }
+
+            .geoportal {
+                padding-top: 14px;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .site-header {
+                max-height: none;
+            }
+
+            .geoportal {
+                padding-top: 10px;
+            }
+        }
         </style>
         <title>Géoportail d'occupation du sol 2015</title>
     </head>
@@ -787,10 +839,10 @@
                             <a class="year-link" href="https://marioce12-bot.github.io/2025/">2025</a>
                         </div>
                         <div class="section-switcher" aria-label="Ouvrir une autre section cartographique">
-                            <a class="section-link" href="https://g-o-mangro-git-main-marioces-projects.vercel.app/cartes#carte-changements">Changements</a>
-                            <a class="section-link" href="https://g-o-mangro-git-main-marioces-projects.vercel.app/predictions">Prédiction 2040</a>
-                            <a class="section-link" href="https://g-o-mangro-git-main-marioces-projects.vercel.app/cartes#carte-erosion">Érosion</a>
-                            <a class="section-link" href="https://g-o-mangro-git-main-marioces-projects.vercel.app/cartes#carte-submersion">Submersion</a>
+                            <a class="section-link" href="https://g-o-mangro.vercel.app/cartes#carte-changements">Changements</a>
+                            <a class="section-link" href="https://g-o-mangro.vercel.app/predictions">Prédiction 2040</a>
+                            <a class="section-link" href="https://g-o-mangro.vercel.app/cartes#carte-erosion">Érosion</a>
+                            <a class="section-link" href="https://g-o-mangro.vercel.app/cartes#carte-submersion">Submersion</a>
                         </div>
                         <form class="place-search" id="place-search" aria-label="Rechercher un lieu">
                             <input id="place-search-input" name="q" type="search" placeholder="Ville, pays ou lieu" autocomplete="off">
