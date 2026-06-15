@@ -1003,6 +1003,56 @@
             font-weight: 800;
             line-height: 1.4;
         }
+
+        .zone-inset {
+            position: absolute;
+            left: 24px;
+            bottom: 24px;
+            z-index: 25;
+            width: min(240px, calc(100% - 48px));
+            height: 160px;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.92);
+            border-radius: 18px;
+            background: #0d241d;
+            box-shadow: 0 18px 42px rgba(13, 44, 32, 0.28);
+            display: none;
+        }
+
+        .zone-inset.is-visible { display: block; }
+
+        .zone-inset-title {
+            position: absolute;
+            left: 8px;
+            top: 8px;
+            z-index: 2;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.9);
+            color: var(--green-dark);
+            font-size: 0.68rem;
+            font-weight: 900;
+        }
+
+        #zone-inset-map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .zone-inset .ol-control,
+        .zone-inset .ol-attribution {
+            display: none !important;
+        }
+
+        @media (max-width: 560px) {
+            .zone-inset {
+                left: 14px;
+                bottom: 14px;
+                width: min(190px, calc(100% - 28px));
+                height: 125px;
+                border-radius: 14px;
+            }
+        }
         </style>
         <title>Géoportail d'occupation du sol 2015</title>
     </head>
@@ -1143,6 +1193,10 @@
                                 <div id="popup-content"></div>
                             </div>
                         </div>
+                        <div class="zone-inset" id="zone-inset" aria-label="Aperçu satellite de la zone sélectionnée">
+                            <div class="zone-inset-title">Zone satellite</div>
+                            <div id="zone-inset-map"></div>
+                        </div>
                     </div>
                 </section>
             </main>
@@ -1225,8 +1279,53 @@
                 var drawInteraction = null;
                 var selectedFeature = null;
                 var finishDrawOnRightClick = null;
+                var insetMap = null;
+                var insetSource = null;
+                var insetElement = document.getElementById('zone-inset');
 
                 function setStatus(message) { status.textContent = message; }
+
+                function ensureInsetMap() {
+                    if (insetMap || !insetElement) { return; }
+                    insetSource = new ol.source.Vector();
+                    insetMap = new ol.Map({
+                        target: 'zone-inset-map',
+                        controls: [],
+                        interactions: [],
+                        layers: [
+                            new ol.layer.Tile({
+                                source: new ol.source.XYZ({
+                                    attributions: 'Tiles &copy; Esri',
+                                    url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+                                })
+                            }),
+                            new ol.layer.Vector({
+                                source: insetSource,
+                                style: new ol.style.Style({
+                                    fill: new ol.style.Fill({ color: 'rgba(255, 255, 255, 0.08)' }),
+                                    stroke: new ol.style.Stroke({ color: '#ffffff', width: 3 })
+                                })
+                            })
+                        ],
+                        view: new ol.View({ center: map.getView().getCenter(), zoom: map.getView().getZoom() || 12 })
+                    });
+                }
+
+                function updateInset(feature) {
+                    ensureInsetMap();
+                    if (!insetMap || !insetSource || !insetElement) { return; }
+                    insetSource.clear();
+                    if (!feature) {
+                        insetElement.classList.remove('is-visible');
+                        return;
+                    }
+                    insetSource.addFeature(feature.clone());
+                    insetElement.classList.add('is-visible');
+                    setTimeout(function() {
+                        insetMap.updateSize();
+                        insetMap.getView().fit(feature.getGeometry().getExtent(), { padding: [18, 18, 18, 18], maxZoom: 17, duration: 250 });
+                    }, 50);
+                }
 
                 function stopDrawing() {
                     if (finishDrawOnRightClick) {
@@ -1290,7 +1389,7 @@
                     drawInteraction.once('drawend', function(event) {
                         selectedFeature = event.feature;
                         setTimeout(stopDrawing, 0);
-                        setTimeout(function() { syncTextarea(selectedFeature); fitFeature(selectedFeature); }, 50);
+                        setTimeout(function() { syncTextarea(selectedFeature); fitFeature(selectedFeature); updateInset(selectedFeature); }, 50);
                         setStatus('Zone dessinée. Vous pouvez exporter la mise en page PDF.');
                     });
                 });
@@ -1303,6 +1402,7 @@
                     selectedFeature = new ol.Feature(new ol.geom.Polygon([coords]));
                     source.addFeature(selectedFeature);
                     fitFeature(selectedFeature);
+                    updateInset(selectedFeature);
                     setStatus('Zone appliquée depuis les coordonnées.');
                 });
 
@@ -1311,6 +1411,7 @@
                     source.clear();
                     selectedFeature = null;
                     textarea.value = '';
+                    updateInset(null);
                     setStatus('Aucune zone sélectionnée.');
                 });
 
@@ -1521,6 +1622,27 @@
                     return { widthPercent: widthPercent, label: nice >= 1000 ? (nice / 1000).toFixed(nice >= 10000 ? 0 : 1) + ' km' : Math.round(nice) + ' m' };
                 }
 
+                function getBufferedExtent(extent) {
+                    var width = extent[2] - extent[0];
+                    var height = extent[3] - extent[1];
+                    var pad = Math.max(width, height) * 0.22 || 1000;
+                    return [extent[0] - pad, extent[1] - pad, extent[2] + pad, extent[3] + pad];
+                }
+
+                function getSatelliteInsetPrintHtml() {
+                    if (!selectedFeature) { return ''; }
+                    var exportExtent = getBufferedExtent(selectedFeature.getGeometry().getExtent());
+                    var imageWidth = 600;
+                    var imageHeight = 360;
+                    var imageUrl = 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=' + exportExtent.join(',') + '&bboxSR=3857&imageSR=3857&size=' + imageWidth + ',' + imageHeight + '&format=png&transparent=false&f=image';
+                    var points = selectedFeature.getGeometry().getCoordinates()[0].map(function(coord) {
+                        var x = (coord[0] - exportExtent[0]) / (exportExtent[2] - exportExtent[0]) * imageWidth;
+                        var y = (exportExtent[3] - coord[1]) / (exportExtent[3] - exportExtent[1]) * imageHeight;
+                        return x.toFixed(1) + ',' + y.toFixed(1);
+                    }).join(' ');
+                    return '<section><h2>Carton satellite</h2><div class="sat-inset-print"><img src="' + imageUrl + '" alt="Aperçu satellite de la zone"><svg viewBox="0 0 ' + imageWidth + ' ' + imageHeight + '"><polygon points="' + points + '"></polygon></svg></div></section>';
+                }
+
                 async function openPrintLayout(imageUrl) {
                     var coords = getPolygonCoordinates(selectedFeature);
                     var extent = ol.proj.transformExtent(selectedFeature.getGeometry().getExtent(), map.getView().getProjection(), 'EPSG:4326');
@@ -1529,11 +1651,12 @@
                     }).join('');
                     var areaRows = buildAreaRows(await calculateClassAreas());
                     var legendHtml = buildLegendHtml(getPrintableLegends());
+                    var satelliteInsetHtml = getSatelliteInsetPrintHtml();
                     var scale = getScaleBar();
                     var title = document.title || 'Carte de la zone sélectionnée';
                     var printed = window.open('', '_blank');
                     if (!printed) { setStatus('Autorisez les popups pour générer le PDF.'); return; }
-                    printed.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + title + '</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#14241e}h1{margin:0 0 6px;font-size:22px}h2{margin:14px 0 8px;font-size:14px}.meta{color:#65766f;margin:0 0 14px}.map-wrap{position:relative;border:1px solid #b8c8bf;border-radius:12px;overflow:hidden}.map{display:block;width:100%}.north{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;font-weight:900}.north:before{content:"▲";display:block;color:#0d3c29;line-height:1}.north span{position:absolute;bottom:5px;font-size:10px}.scale{position:absolute;left:18px;bottom:18px;height:22px;border-left:2px solid #14241e;border-right:2px solid #14241e;border-bottom:4px solid #14241e;background:rgba(255,255,255,.8);text-align:center;font-size:11px;font-weight:700}.scale b{position:relative;top:4px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.legend-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px}.legend-item{display:flex;align-items:center;gap:6px;font-size:11px}.legend-item img{width:14px;height:14px;object-fit:contain}table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px}td,th{border:1px solid #d8e2dc;padding:5px;text-align:right}th:first-child,td:first-child{text-align:left}.bbox{margin-top:10px;font-size:11px;color:#33443d}@page{size:A4 landscape;margin:12mm}@media print{body{margin:0}.map{max-height:126mm;object-fit:contain}}</style></head><body><h1>' + title + '</h1><p class="meta">Zone sélectionnée - ' + new Date().toLocaleString('fr-FR') + '</p><div class="grid"><main><div class="map-wrap"><img class="map" src="' + imageUrl + '" alt="Carte de la zone sélectionnée"><div class="north"><span>N</span></div><div class="scale" style="width:' + scale.widthPercent + '%"><b>' + scale.label + '</b></div></div><p class="bbox">Emprise: Ouest ' + extent[0].toFixed(6) + ', Sud ' + extent[1].toFixed(6) + ', Est ' + extent[2].toFixed(6) + ', Nord ' + extent[3].toFixed(6) + '</p><h2>Superficies estimées dans la zone</h2><table><thead><tr><th>Classe</th><th>Surface ha</th><th>Part</th></tr></thead><tbody>' + areaRows + '</tbody></table></main><aside>' + legendHtml + '<h2>Points du polygone</h2><table><thead><tr><th>Point</th><th>Longitude</th><th>Latitude</th></tr></thead><tbody>' + pointRows + '</tbody></table></aside></div><script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
+                    printed.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + title + '</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#14241e}h1{margin:0 0 6px;font-size:22px}h2{margin:14px 0 8px;font-size:14px}.meta{color:#65766f;margin:0 0 14px}.map-wrap{position:relative;border:1px solid #b8c8bf;border-radius:12px;overflow:hidden}.map{display:block;width:100%}.north{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;font-weight:900}.north:before{content:"▲";display:block;color:#0d3c29;line-height:1}.north span{position:absolute;bottom:5px;font-size:10px}.scale{position:absolute;left:18px;bottom:18px;height:22px;border-left:2px solid #14241e;border-right:2px solid #14241e;border-bottom:4px solid #14241e;background:rgba(255,255,255,.8);text-align:center;font-size:11px;font-weight:700}.scale b{position:relative;top:4px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.legend-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px}.legend-item{display:flex;align-items:center;gap:6px;font-size:11px}.legend-item img{width:14px;height:14px;object-fit:contain}.sat-inset-print{position:relative;overflow:hidden;border:1px solid #b8c8bf;border-radius:10px}.sat-inset-print img{display:block;width:100%}.sat-inset-print svg{position:absolute;inset:0;width:100%;height:100%}.sat-inset-print polygon{fill:rgba(255,255,255,.15);stroke:#fff;stroke-width:4;vector-effect:non-scaling-stroke}table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px}td,th{border:1px solid #d8e2dc;padding:5px;text-align:right}th:first-child,td:first-child{text-align:left}.bbox{margin-top:10px;font-size:11px;color:#33443d}@page{size:A4 landscape;margin:12mm}@media print{body{margin:0}.map{max-height:126mm;object-fit:contain}}</style></head><body><h1>' + title + '</h1><p class="meta">Zone sélectionnée - ' + new Date().toLocaleString('fr-FR') + '</p><div class="grid"><main><div class="map-wrap"><img class="map" src="' + imageUrl + '" alt="Carte de la zone sélectionnée"><div class="north"><span>N</span></div><div class="scale" style="width:' + scale.widthPercent + '%"><b>' + scale.label + '</b></div></div><p class="bbox">Emprise: Ouest ' + extent[0].toFixed(6) + ', Sud ' + extent[1].toFixed(6) + ', Est ' + extent[2].toFixed(6) + ', Nord ' + extent[3].toFixed(6) + '</p><h2>Superficies estimées dans la zone</h2><table><thead><tr><th>Classe</th><th>Surface ha</th><th>Part</th></tr></thead><tbody>' + areaRows + '</tbody></table></main><aside>' + satelliteInsetHtml + legendHtml + '<h2>Points du polygone</h2><table><thead><tr><th>Point</th><th>Longitude</th><th>Latitude</th></tr></thead><tbody>' + pointRows + '</tbody></table></aside></div><script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
                     printed.document.close();
                     setStatus('Mise en page PDF ouverte. Choisissez Enregistrer en PDF dans la fenêtre d’impression.');
                 }
