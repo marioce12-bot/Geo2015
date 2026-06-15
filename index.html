@@ -1054,9 +1054,18 @@
                         <p class="section-label">Vue d'ensemble</p>
                         <h2>Occupation du sol et repères territoriaux</h2>
                         <p class="lead">Cette carte présente les classes d'occupation du sol 2015 sous forme raster, avec les limites communales et le réseau routier en couches vectorielles consultables.</p>
-                        <div class="stat-grid" aria-label="Résumé des couches">
-                            <div class="stat"><strong>8</strong><span>classes d'occupation</span></div>
-                            <div class="stat"><strong>5</strong><span>couches cartographiques</span></div>
+                        <div class="zone-panel" aria-label="Sélection et export de zone">
+                            <p class="section-label">Export PDF</p>
+                            <h2>Zone personnalisée</h2>
+                            <p class="zone-help">Dessinez un polygone sur la carte ou saisissez les points en longitude, latitude, un point par ligne.</p>
+                            <textarea id="zone-coordinates" spellcheck="false" placeholder="Exemple :&#10;1.7800, 6.2900&#10;1.8050, 6.2920&#10;1.8100, 6.2700"></textarea>
+                            <div class="zone-actions">
+                                <button type="button" id="zone-draw">Dessiner</button>
+                                <button type="button" id="zone-apply">Appliquer coordonnées</button>
+                                <button type="button" id="zone-clear">Effacer</button>
+                                <button type="button" id="zone-export" class="primary-action">Exporter PDF</button>
+                            </div>
+                            <div class="zone-status" id="zone-status" aria-live="polite">Aucune zone sélectionnée.</div>
                         </div>
                     </section>
 
@@ -1116,19 +1125,6 @@
                             <li><img src="styles/legend/Routesecondaire_3.png" alt=""> Route secondaire</li>
                             <li><img src="styles/legend/ROUTE_4_0.png" alt=""> Route nationale RNIE</li>
                         </ul>
-                    </section>
-                    <section class="info-card zone-panel" aria-label="Sélection et export de zone">
-                        <p class="section-label">Export PDF</p>
-                        <h2>Zone personnalisée</h2>
-                        <p class="zone-help">Dessinez un polygone sur la carte ou saisissez les points en longitude, latitude, un point par ligne.</p>
-                        <textarea id="zone-coordinates" spellcheck="false" placeholder="Exemple :&#10;1.7800, 6.2900&#10;1.8050, 6.2920&#10;1.8100, 6.2700"></textarea>
-                        <div class="zone-actions">
-                            <button type="button" id="zone-draw">Dessiner</button>
-                            <button type="button" id="zone-apply">Appliquer coordonnées</button>
-                            <button type="button" id="zone-clear">Effacer</button>
-                            <button type="button" id="zone-export" class="primary-action">Exporter PDF</button>
-                        </div>
-                        <div class="zone-status" id="zone-status" aria-live="polite">Aucune zone sélectionnée.</div>
                     </section>
                 </aside>
 
