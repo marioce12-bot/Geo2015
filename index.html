@@ -910,13 +910,13 @@
         }
 
         .coordinate-readout {
-            position: absolute;
-            left: 50%;
-            bottom: 18px;
-            z-index: 30;
-            display: block !important;
-            transform: translateX(-50%);
-            max-width: calc(100% - 32px);
+            position: static;
+            display: inline-flex !important;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            transform: none;
+            max-width: 100%;
             padding: 7px 12px;
             border: 1px solid rgba(31, 111, 74, 0.18);
             border-radius: 999px;
@@ -1069,7 +1069,7 @@
                             <h2>Carte interactive</h2>
                             <p>Zoomez, activez les couches et cliquez sur les éléments vectoriels pour afficher les attributs.</p>
                         </div>
-                        <span class="status-badge">Raster conservé sans modification</span>
+                        <div class="coordinate-readout" id="coordinate-readout">Lon: --, Lat: --</div>
                     </div>
                     <div class="map-shell">
                         <div id="map">
@@ -1078,7 +1078,6 @@
                                 <div id="popup-content"></div>
                             </div>
                         </div>
-                        <div class="coordinate-readout" id="coordinate-readout">Lon: --, Lat: --</div>
                     </div>
                 </section>
             </main>
