@@ -824,7 +824,6 @@
 
         .brand,
         .header-meta,
-        .place-search,
         .coordinate-readout,
         .tool-status {
             display: none !important;
@@ -876,6 +875,64 @@
             .base-toggle {
                 font-size: 0.68rem;
                 padding: 5px 7px;
+            }
+        }
+
+        .place-search {
+            display: grid !important;
+            grid-template-columns: minmax(120px, 1fr) auto;
+            flex: 0 1 230px;
+            max-width: min(230px, 100%);
+            gap: 4px;
+        }
+
+        .place-search input {
+            height: 27px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            padding: 4px 9px;
+        }
+
+        .place-search button {
+            height: 27px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            padding: 4px 9px;
+        }
+
+        .coordinate-readout {
+            position: fixed;
+            left: 50%;
+            bottom: max(12px, env(safe-area-inset-bottom));
+            z-index: 1200;
+            display: block !important;
+            transform: translateX(-50%);
+            padding: 7px 12px;
+            border: 1px solid rgba(31, 111, 74, 0.18);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 12px 28px rgba(20, 40, 34, 0.16);
+            color: var(--green-dark);
+            pointer-events: none;
+            backdrop-filter: blur(12px);
+        }
+
+        @media (max-width: 560px) {
+            .place-search {
+                flex-basis: 190px;
+                max-width: 190px;
+            }
+
+            .place-search input,
+            .place-search button {
+                font-size: 0.68rem;
+                height: 26px;
+                padding: 4px 7px;
+            }
+
+            .coordinate-readout {
+                font-size: 0.72rem;
+                padding: 6px 10px;
             }
         }
         </style>
@@ -1044,6 +1101,21 @@
         })();
         </script>
         <script>
+        (function trackPointerCoordinates() {
+            var coordinateReadout = document.getElementById('coordinate-readout');
+            var mapElement = document.getElementById('map');
+            if (!coordinateReadout || !mapElement) { return; }
+
+            function updateCoordinate(event) {
+                if (!window.map || typeof window.map.getEventCoordinate !== 'function' || !window.ol || !ol.proj) { return; }
+                var coordinate = window.map.getEventCoordinate(event);
+                var lonLat = ol.proj.toLonLat(coordinate);
+                coordinateReadout.textContent = 'Lon: ' + lonLat[0].toFixed(5) + ', Lat: ' + lonLat[1].toFixed(5);
+            }
+
+            mapElement.addEventListener('pointermove', updateCoordinate);
+        })();
+
         (function stabilizeMapOnTouchDevices() {
             var mapElement = document.getElementById('map');
             if (!mapElement) {
