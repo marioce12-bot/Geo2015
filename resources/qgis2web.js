@@ -1,8 +1,24 @@
 
+var osmBaseLayer = new ol.layer.Tile({
+    title: 'OpenStreetMap',
+    type: 'base',
+    visible: true,
+    source: new ol.source.OSM()
+});
+
+var satelliteBaseLayer = new ol.layer.Tile({
+    title: 'Satellite',
+    type: 'base',
+    visible: false,
+    source: new ol.source.XYZ({
+        attributions: 'Tiles &copy; Esri',
+        url: 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+    })
+});
 var map = new ol.Map({
     target: 'map',
     renderer: 'canvas',
-    layers: layersList,
+    layers: [osmBaseLayer, satelliteBaseLayer].concat(layersList),
     view: new ol.View({
          maxZoom: 28, minZoom: 1
     })
@@ -65,7 +81,7 @@ styleCursorMove();
         })(),
     });
     map.addControl(bottomLeftContainer)
-  
+
     //top right container
     var topRightContainer = new ol.control.Control({
         element: (() => {
@@ -110,8 +126,90 @@ var overlayPopup = new ol.Overlay({
 	autoPan: true
 });
 map.addOverlay(overlayPopup)
-    
-    
+function setBaseMap(baseName) {
+    var showSatellite = baseName === 'satellite';
+    osmBaseLayer.setVisible(!showSatellite);
+    satelliteBaseLayer.setVisible(showSatellite);
+    var osmButton = document.getElementById('base-osm');
+    var satelliteButton = document.getElementById('base-satellite');
+    if (osmButton && satelliteButton) {
+        osmButton.classList.toggle('active', !showSatellite);
+        satelliteButton.classList.toggle('active', showSatellite);
+    }
+}
+
+function initGeoportalTools() {
+    var form = document.getElementById('place-search');
+    var input = document.getElementById('place-search-input');
+    var status = document.getElementById('place-search-status');
+    var coordinates = document.getElementById('coordinate-readout');
+    var osmButton = document.getElementById('base-osm');
+    var satelliteButton = document.getElementById('base-satellite');
+
+    if (osmButton) {
+        osmButton.addEventListener('click', function() { setBaseMap('osm'); });
+    }
+    if (satelliteButton) {
+        satelliteButton.addEventListener('click', function() { setBaseMap('satellite'); });
+    }
+
+    if (coordinates) {
+        map.on('pointermove', function(evt) {
+            var lonLat = ol.proj.toLonLat(evt.coordinate);
+            coordinates.textContent = 'Lon: ' + lonLat[0].toFixed(5) + ', Lat: ' + lonLat[1].toFixed(5);
+        });
+        map.getViewport().addEventListener('mouseleave', function() {
+            coordinates.textContent = 'Lon: --, Lat: --';
+        });
+    }
+
+    if (!form || !input || !status) {
+        return;
+    }
+
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        var query = input.value.trim();
+        if (!query) {
+            status.textContent = 'Saisissez un lieu a rechercher.';
+            return;
+        }
+
+        status.textContent = 'Recherche en cours...';
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('Erreur de recherche');
+                }
+                return response.json();
+            })
+            .then(function(results) {
+                if (!results.length) {
+                    status.textContent = 'Aucun resultat trouve.';
+                    return;
+                }
+                var result = results[0];
+                var lon = parseFloat(result.lon);
+                var lat = parseFloat(result.lat);
+                var projected = ol.proj.fromLonLat([lon, lat]);
+                var zoom = Math.max(map.getView().getZoom() || 0, 14);
+                map.getView().animate({ center: projected, zoom: zoom, duration: 600 });
+                popupContent = '<strong>Resultat de recherche</strong><br>' + result.display_name;
+                popupCoord = projected;
+                updatePopup();
+                status.textContent = 'Carte centree sur : ' + result.display_name;
+            })
+            .catch(function() {
+                status.textContent = 'Recherche indisponible. Verifiez la connexion puis reessayez.';
+            });
+    });
+}
+
+initGeoportalTools();
+
+
 var NO_POPUP = 0
 var ALL_FIELDS = 1
 
@@ -248,7 +346,7 @@ function onPointerMove(evt) {
                     popupText += '<li><table>'
                     popupText += '<a>' + '<b>' + layer.get('popuplayertitle') + '</b>' + '</a>';
                     popupText += createPopupField(currentFeature, currentFeatureKeys, layer);
-                    popupText += '</table></li>';    
+                    popupText += '</table></li>';
                 }
             }
         } else {
@@ -267,7 +365,7 @@ function onPointerMove(evt) {
     } else {
         popupText += '</ul>';
     }
-    
+
 	if (doHighlight) {
         if (currentFeature !== highlight) {
             if (highlight) {
@@ -353,7 +451,7 @@ function updatePopup() {
         closer.blur();
         stopMediaInPopup();
     }
-} 
+}
 
 function onSingleClickFeatures(evt) {
     if (doHover || sketch) {
@@ -368,7 +466,7 @@ function onSingleClickFeatures(evt) {
     var currentFeatureKeys;
     var clusteredFeatures;
     var popupText = '<ul>';
-    
+
     map.forEachFeatureAtPixel(pixel, function(feature, layer) {
         if (layer && feature instanceof ol.Feature && (layer.get("interactive") || layer.get("interactive") === undefined)) {
             var doPopup = false;
@@ -387,7 +485,7 @@ function onSingleClickFeatures(evt) {
                         popupText += '<li><table>';
                         popupText += '<a><b>' + layer.get('popuplayertitle') + '</b></a>';
                         popupText += createPopupField(currentFeature, currentFeatureKeys, layer);
-                        popupText += '</table></li>';    
+                        popupText += '</table></li>';
                     }
                 }
             } else {
@@ -406,7 +504,7 @@ function onSingleClickFeatures(evt) {
     } else {
         popupText += '</ul>';
     }
-	
+
 	popupContent = popupText;
     popupCoord = coord;
     updatePopup();
@@ -526,7 +624,7 @@ var layerSwitcher = new ol.control.LayerSwitcher({
     target: 'top-right-container'
 });
 map.addControl(layerSwitcher);
-    
+
 
 
 
@@ -563,7 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	if (doHover || doHighlight) {
 		var controlElements = document.getElementsByClassName('ol-control');
 		for (var i = 0; i < controlElements.length; i++) {
-			controlElements[i].addEventListener('mouseover', function() { 
+			controlElements[i].addEventListener('mouseover', function() {
 				doHover = false;
 				doHighlight = false;
 			});

@@ -570,6 +570,94 @@
                 max-height: 50dvh;
             }
         }
+
+        .geo-tools-card {
+            display: grid;
+            gap: 12px;
+        }
+
+        .year-switcher,
+        .base-switcher {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .year-link,
+        .base-toggle {
+            border: 1px solid rgba(31, 111, 74, 0.22);
+            border-radius: 999px;
+            background: #f7faf6;
+            color: var(--green-dark);
+            cursor: pointer;
+            font: inherit;
+            font-size: 0.82rem;
+            font-weight: 800;
+            padding: 8px 12px;
+            text-decoration: none;
+            transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .year-link:hover,
+        .year-link:focus-visible,
+        .base-toggle:hover,
+        .base-toggle:focus-visible {
+            border-color: rgba(31, 111, 74, 0.5);
+            background: #e8f4ea;
+        }
+
+        .year-link.active,
+        .base-toggle.active {
+            border-color: var(--green);
+            background: var(--green);
+            color: #fff;
+        }
+
+        .place-search {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 8px;
+        }
+
+        .place-search input {
+            min-width: 0;
+            width: 100%;
+            border: 1px solid rgba(31, 111, 74, 0.22);
+            border-radius: 14px;
+            color: var(--ink);
+            font: inherit;
+            padding: 10px 12px;
+        }
+
+        .place-search button {
+            border: 0;
+            border-radius: 14px;
+            background: var(--green);
+            color: #fff;
+            cursor: pointer;
+            font: inherit;
+            font-weight: 850;
+            padding: 10px 14px;
+        }
+
+        .tool-status,
+        .coordinate-readout {
+            color: var(--muted);
+            font-size: 0.82rem;
+            line-height: 1.4;
+        }
+
+        .coordinate-readout {
+            color: var(--green-dark);
+            font-variant-numeric: tabular-nums;
+            font-weight: 800;
+        }
+
+        @media (max-width: 560px) {
+            .place-search {
+                grid-template-columns: 1fr;
+            }
+        }
         </style>
         <title>Géoportail d'occupation du sol 2015</title>
     </head>
@@ -601,6 +689,27 @@
                             <div class="stat"><strong>5</strong><span>couches cartographiques</span></div>
                         </div>
                     </section>
+
+                    <section class="info-card geo-tools-card">
+                        <p class="section-label">Navigation</p>
+                        <h2>Recherche et annees</h2>
+                        <div class="year-switcher" aria-label="Changer d'annee">
+                            <a class="year-link active" href="https://marioce12-bot.github.io/Geo2015/">2015</a>
+                            <a class="year-link" href="https://marioce12-bot.github.io/2020/">2020</a>
+                            <a class="year-link" href="https://marioce12-bot.github.io/2025/">2025</a>
+                        </div>
+                        <form class="place-search" id="place-search" aria-label="Rechercher un lieu">
+                            <input id="place-search-input" name="q" type="search" placeholder="Ville, pays ou lieu" autocomplete="off">
+                            <button type="submit">Rechercher</button>
+                        </form>
+                        <div class="base-switcher" aria-label="Changer de fond de carte">
+                            <button class="base-toggle active" id="base-osm" type="button">OSM</button>
+                            <button class="base-toggle" id="base-satellite" type="button">Satellite</button>
+                        </div>
+                        <div class="coordinate-readout" id="coordinate-readout">Lon: --, Lat: --</div>
+                        <div class="tool-status" id="place-search-status" aria-live="polite">Saisissez un lieu pour centrer la carte.</div>
+                    </section>
+
 
                     <section class="info-card">
                         <p class="section-label">Légende</p>
@@ -688,7 +797,7 @@
         <script src="resources/olms.js"></script>
         <script src="layers/Limitesdescommunes_0.js"></script><script src="layers/Limite_2.js"></script><script src="layers/Routesecondaire_3.js"></script><script src="layers/ROUTE_4.js"></script>
         <script src="styles/Limitesdescommunes_0_style.js"></script><script src="styles/Limite_2_style.js"></script><script src="styles/Routesecondaire_3_style.js"></script><script src="styles/ROUTE_4_style.js"></script>
-        <script src="./layers/layers.js" type="text/javascript"></script> 
+        <script src="./layers/layers.js" type="text/javascript"></script>
         <script src="./resources/Autolinker.min.js"></script>
         <script src="./resources/qgis2web.js"></script>
         <script>
@@ -730,6 +839,6 @@
                 new ResizeObserver(refreshMapSize).observe(mapElement);
             }
         })();
-        </script>        
+        </script>
     </body>
 </html>
