@@ -947,6 +947,62 @@
                 padding: 6px 10px;
             }
         }
+
+        .zone-panel {
+            display: grid;
+            gap: 10px;
+        }
+
+        .zone-panel textarea {
+            min-height: 104px;
+            resize: vertical;
+            border: 1px solid rgba(31, 111, 74, 0.22);
+            border-radius: 14px;
+            color: var(--ink);
+            font: inherit;
+            font-size: 0.82rem;
+            line-height: 1.4;
+            padding: 10px 12px;
+        }
+
+        .zone-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .zone-actions button {
+            border: 1px solid rgba(31, 111, 74, 0.22);
+            border-radius: 999px;
+            background: #f7faf6;
+            color: var(--green-dark);
+            cursor: pointer;
+            font: inherit;
+            font-size: 0.78rem;
+            font-weight: 850;
+            padding: 8px 11px;
+        }
+
+        .zone-actions .primary-action {
+            border-color: var(--green);
+            background: var(--green);
+            color: #fff;
+        }
+
+        .zone-help {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.76rem;
+            line-height: 1.45;
+        }
+
+        .zone-status {
+            min-height: 1.3em;
+            color: var(--green-dark);
+            font-size: 0.78rem;
+            font-weight: 800;
+            line-height: 1.4;
+        }
         </style>
         <title>Géoportail d'occupation du sol 2015</title>
     </head>
@@ -1061,6 +1117,19 @@
                             <li><img src="styles/legend/ROUTE_4_0.png" alt=""> Route nationale RNIE</li>
                         </ul>
                     </section>
+                    <section class="info-card zone-panel" aria-label="Sélection et export de zone">
+                        <p class="section-label">Export PDF</p>
+                        <h2>Zone personnalisée</h2>
+                        <p class="zone-help">Dessinez un polygone sur la carte ou saisissez les points en longitude, latitude, un point par ligne.</p>
+                        <textarea id="zone-coordinates" spellcheck="false" placeholder="Exemple :&#10;1.7800, 6.2900&#10;1.8050, 6.2920&#10;1.8100, 6.2700"></textarea>
+                        <div class="zone-actions">
+                            <button type="button" id="zone-draw">Dessiner</button>
+                            <button type="button" id="zone-apply">Appliquer coordonnées</button>
+                            <button type="button" id="zone-clear">Effacer</button>
+                            <button type="button" id="zone-export" class="primary-action">Exporter PDF</button>
+                        </div>
+                        <div class="zone-status" id="zone-status" aria-live="polite">Aucune zone sélectionnée.</div>
+                    </section>
                 </aside>
 
                 <section class="map-card" aria-label="Carte interactive">
@@ -1125,6 +1194,175 @@
             }
 
             mapElement.addEventListener('pointermove', updateCoordinate);
+        })();
+
+        (function initZoneExportTools() {
+            function ready(callback) {
+                if (window.map && window.ol && ol.layer && ol.source && ol.interaction) { callback(); return; }
+                setTimeout(function() { ready(callback); }, 100);
+            }
+
+            ready(function() {
+                var textarea = document.getElementById('zone-coordinates');
+                var drawButton = document.getElementById('zone-draw');
+                var applyButton = document.getElementById('zone-apply');
+                var clearButton = document.getElementById('zone-clear');
+                var exportButton = document.getElementById('zone-export');
+                var status = document.getElementById('zone-status');
+                if (!textarea || !drawButton || !applyButton || !clearButton || !exportButton || !status) { return; }
+
+                var source = new ol.source.Vector();
+                var layer = new ol.layer.Vector({
+                    source: source,
+                    style: new ol.style.Style({
+                        fill: new ol.style.Fill({ color: 'rgba(28, 107, 70, 0.18)' }),
+                        stroke: new ol.style.Stroke({ color: '#1c6b46', width: 3 }),
+                        image: new ol.style.Circle({
+                            radius: 5,
+                            fill: new ol.style.Fill({ color: '#ffffff' }),
+                            stroke: new ol.style.Stroke({ color: '#1c6b46', width: 2 })
+                        })
+                    })
+                });
+                map.addLayer(layer);
+
+                var drawInteraction = null;
+                var selectedFeature = null;
+
+                function setStatus(message) { status.textContent = message; }
+
+                function stopDrawing() {
+                    if (drawInteraction) { map.removeInteraction(drawInteraction); drawInteraction = null; }
+                    drawButton.textContent = 'Dessiner';
+                }
+
+                function getPolygonCoordinates(feature) {
+                    if (!feature) { return []; }
+                    return feature.getGeometry().getCoordinates()[0].map(function(coord) {
+                        return ol.proj.toLonLat(coord);
+                    });
+                }
+
+                function syncTextarea(feature) {
+                    var coords = getPolygonCoordinates(feature);
+                    textarea.value = coords.map(function(coord) {
+                        return coord[0].toFixed(6) + ', ' + coord[1].toFixed(6);
+                    }).join('\n');
+                }
+
+                function fitFeature(feature) {
+                    if (!feature) { return; }
+                    map.getView().fit(feature.getGeometry().getExtent(), {
+                        padding: [70, 70, 70, 70],
+                        duration: 500,
+                        maxZoom: 17
+                    });
+                }
+
+                function parseManualCoordinates() {
+                    var rows = textarea.value.split(/\n|;/).map(function(row) { return row.trim(); }).filter(Boolean);
+                    var coords = rows.map(function(row) {
+                        var parts = row.split(/[ ,\t]+/).filter(Boolean).map(Number);
+                        if (parts.length < 2 || !isFinite(parts[0]) || !isFinite(parts[1])) { return null; }
+                        return ol.proj.fromLonLat([parts[0], parts[1]]);
+                    });
+                    if (coords.length < 3 || coords.some(function(coord) { return !coord; })) { return null; }
+                    var first = coords[0];
+                    var last = coords[coords.length - 1];
+                    if (first[0] !== last[0] || first[1] !== last[1]) { coords.push(first.slice()); }
+                    return coords;
+                }
+
+                drawButton.addEventListener('click', function() {
+                    if (drawInteraction) { stopDrawing(); return; }
+                    source.clear();
+                    selectedFeature = null;
+                    drawInteraction = new ol.interaction.Draw({ source: source, type: 'Polygon' });
+                    map.addInteraction(drawInteraction);
+                    drawButton.textContent = 'Terminer';
+                    setStatus('Cliquez sur la carte pour placer les points du polygone. Double-cliquez pour terminer.');
+                    drawInteraction.once('drawend', function(event) {
+                        selectedFeature = event.feature;
+                        setTimeout(stopDrawing, 0);
+                        setTimeout(function() { syncTextarea(selectedFeature); fitFeature(selectedFeature); }, 50);
+                        setStatus('Zone dessinée. Vous pouvez exporter la mise en page PDF.');
+                    });
+                });
+
+                applyButton.addEventListener('click', function() {
+                    stopDrawing();
+                    var coords = parseManualCoordinates();
+                    if (!coords) { setStatus('Coordonnées invalides. Utilisez au moins 3 lignes au format lon, lat.'); return; }
+                    source.clear();
+                    selectedFeature = new ol.Feature(new ol.geom.Polygon([coords]));
+                    source.addFeature(selectedFeature);
+                    fitFeature(selectedFeature);
+                    setStatus('Zone appliquée depuis les coordonnées.');
+                });
+
+                clearButton.addEventListener('click', function() {
+                    stopDrawing();
+                    source.clear();
+                    selectedFeature = null;
+                    textarea.value = '';
+                    setStatus('Aucune zone sélectionnée.');
+                });
+
+                function renderMapImage(callback, onError) {
+                    map.once('rendercomplete', function() {
+                        try {
+                            var size = map.getSize();
+                            var canvas = document.createElement('canvas');
+                            canvas.width = size[0];
+                            canvas.height = size[1];
+                            var context = canvas.getContext('2d');
+                            document.querySelectorAll('#map .ol-layer canvas').forEach(function(layerCanvas) {
+                                if (layerCanvas.width <= 0 || layerCanvas.height <= 0) { return; }
+                                var opacity = layerCanvas.parentNode.style.opacity || layerCanvas.style.opacity || 1;
+                                context.globalAlpha = Number(opacity);
+                                var transform = layerCanvas.style.transform;
+                                if (transform && transform.indexOf('matrix') === 0) {
+                                    var matrix = transform.match(/^matrix\(([^\(]*)\)$/)[1].split(',').map(Number);
+                                    CanvasRenderingContext2D.prototype.setTransform.apply(context, matrix);
+                                } else {
+                                    context.setTransform(1, 0, 0, 1, 0, 0);
+                                }
+                                context.drawImage(layerCanvas, 0, 0);
+                            });
+                            context.setTransform(1, 0, 0, 1, 0, 0);
+                            context.globalAlpha = 1;
+                            callback(canvas.toDataURL('image/png'));
+                        } catch (error) {
+                            onError(error);
+                        }
+                    });
+                    map.renderSync();
+                }
+
+                function openPrintLayout(imageUrl) {
+                    var coords = getPolygonCoordinates(selectedFeature);
+                    var extent = ol.proj.transformExtent(selectedFeature.getGeometry().getExtent(), map.getView().getProjection(), 'EPSG:4326');
+                    var pointRows = coords.map(function(coord, index) {
+                        return '<tr><td>' + (index + 1) + '</td><td>' + coord[0].toFixed(6) + '</td><td>' + coord[1].toFixed(6) + '</td></tr>';
+                    }).join('');
+                    var title = document.title || 'Carte de la zone sélectionnée';
+                    var printed = window.open('', '_blank');
+                    if (!printed) { setStatus('Autorisez les popups pour générer le PDF.'); return; }
+                    printed.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + title + '</title><style>body{font-family:Arial,sans-serif;margin:28px;color:#14241e}h1{margin:0 0 6px;font-size:22px}.meta{color:#65766f;margin:0 0 18px}.map{width:100%;border:1px solid #b8c8bf;border-radius:12px}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:12px}td,th{border:1px solid #d8e2dc;padding:6px;text-align:right}th:first-child,td:first-child{text-align:left}.bbox{margin-top:12px;font-size:12px;color:#33443d}@page{size:A4 landscape;margin:12mm}@media print{body{margin:0}.map{max-height:128mm;object-fit:contain}}</style></head><body><h1>' + title + '</h1><p class="meta">Zone sélectionnée - ' + new Date().toLocaleString('fr-FR') + '</p><img class="map" src="' + imageUrl + '" alt="Carte de la zone sélectionnée"><p class="bbox">Emprise: Ouest ' + extent[0].toFixed(6) + ', Sud ' + extent[1].toFixed(6) + ', Est ' + extent[2].toFixed(6) + ', Nord ' + extent[3].toFixed(6) + '</p><table><thead><tr><th>Point</th><th>Longitude</th><th>Latitude</th></tr></thead><tbody>' + pointRows + '</tbody></table><script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
+                    printed.document.close();
+                    setStatus('Mise en page PDF ouverte. Choisissez Enregistrer en PDF dans la fenêtre d’impression.');
+                }
+
+                exportButton.addEventListener('click', function() {
+                    if (!selectedFeature) { setStatus('Sélectionnez une zone avant l’export PDF.'); return; }
+                    stopDrawing();
+                    setStatus('Préparation de la mise en page PDF...');
+                    fitFeature(selectedFeature);
+                    setTimeout(function() {
+                        renderMapImage(openPrintLayout, function() { setStatus('Export impossible avec ce fond de carte. Essayez le fond OSM puis relancez.'); });
+                    }, 650);
+                });
+            });
         })();
 
         (function stabilizeMapOnTouchDevices() {
