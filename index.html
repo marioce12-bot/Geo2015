@@ -1224,10 +1224,15 @@
 
                 var drawInteraction = null;
                 var selectedFeature = null;
+                var finishDrawOnRightClick = null;
 
                 function setStatus(message) { status.textContent = message; }
 
                 function stopDrawing() {
+                    if (finishDrawOnRightClick) {
+                        map.getViewport().removeEventListener('contextmenu', finishDrawOnRightClick);
+                        finishDrawOnRightClick = null;
+                    }
                     if (drawInteraction) { map.removeInteraction(drawInteraction); drawInteraction = null; }
                     drawButton.textContent = 'Dessiner';
                 }
@@ -1275,8 +1280,13 @@
                     selectedFeature = null;
                     drawInteraction = new ol.interaction.Draw({ source: source, type: 'Polygon' });
                     map.addInteraction(drawInteraction);
+                    finishDrawOnRightClick = function(event) {
+                        event.preventDefault();
+                        if (drawInteraction && typeof drawInteraction.finishDrawing === 'function') { drawInteraction.finishDrawing(); }
+                    };
+                    map.getViewport().addEventListener('contextmenu', finishDrawOnRightClick);
                     drawButton.textContent = 'Terminer';
-                    setStatus('Cliquez sur la carte pour placer les points du polygone. Double-cliquez pour terminer.');
+                    setStatus('Cliquez sur la carte pour placer les points du polygone. Clic droit pour terminer.');
                     drawInteraction.once('drawend', function(event) {
                         selectedFeature = event.feature;
                         setTimeout(stopDrawing, 0);
@@ -1335,16 +1345,195 @@
                     map.renderSync();
                 }
 
-                function openPrintLayout(imageUrl) {
+                function escapeHtml(value) {
+                    return String(value).replace(/[&<>"]/g, function(character) {
+                        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[character];
+                    });
+                }
+
+                function getPrintableLegends() {
+                    return Array.prototype.slice.call(document.querySelectorAll('.legend-list li')).map(function(item) {
+                        var image = item.querySelector('img');
+                        return {
+                            label: item.textContent.trim(),
+                            src: image ? image.src : ''
+                        };
+                    });
+                }
+
+                function buildLegendHtml(entries) {
+                    if (!entries.length) { return ''; }
+                    return '<section><h2>Légende</h2><div class="legend-grid">' + entries.map(function(entry) {
+                        return '<div class="legend-item">' + (entry.src ? '<img src="' + entry.src + '" alt="">' : '') + '<span>' + escapeHtml(entry.label) + '</span></div>';
+                    }).join('') + '</div></section>';
+                }
+
+                function loadImage(src) {
+                    return new Promise(function(resolve, reject) {
+                        var image = new Image();
+                        image.onload = function() { resolve(image); };
+                        image.onerror = reject;
+                        image.src = src;
+                    });
+                }
+
+                function getClassificationLegendEntries() {
+                    return Array.prototype.slice.call(document.querySelectorAll('.legend-list li')).filter(function(item) {
+                        var image = item.querySelector('img');
+                        return image && /classification/i.test(image.getAttribute('src') || '');
+                    }).map(function(item) {
+                        return { label: item.textContent.trim(), src: item.querySelector('img').src };
+                    });
+                }
+
+                function sampleLegendColor(entry) {
+                    return loadImage(entry.src).then(function(image) {
+                        var canvas = document.createElement('canvas');
+                        canvas.width = image.naturalWidth || image.width;
+                        canvas.height = image.naturalHeight || image.height;
+                        var context = canvas.getContext('2d');
+                        context.drawImage(image, 0, 0);
+                        var data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+                        var total = [0, 0, 0];
+                        var count = 0;
+                        for (var index = 0; index < data.length; index += 4) {
+                            if (data[index + 3] < 20) { continue; }
+                            total[0] += data[index];
+                            total[1] += data[index + 1];
+                            total[2] += data[index + 2];
+                            count += 1;
+                        }
+                        entry.color = count ? total.map(function(value) { return value / count; }) : [0, 0, 0];
+                        return entry;
+                    });
+                }
+
+                function getClassificationLayerInfo() {
+                    var mapLayers = typeof layersList !== 'undefined' ? layersList : [];
+                    for (var index = 0; index < mapLayers.length; index += 1) {
+                        var candidate = mapLayers[index];
+                        var candidateSource = candidate && candidate.getSource && candidate.getSource();
+                        if (!candidateSource || !candidateSource.getImageExtent) { continue; }
+                        var rawUrl = candidateSource.getUrl ? candidateSource.getUrl() : candidateSource.url_;
+                        if (!rawUrl) { continue; }
+                        return {
+                            extent: candidateSource.getImageExtent(),
+                            url: new URL(rawUrl, window.location.href).href
+                        };
+                    }
+                    return null;
+                }
+
+                function polygonContainsCoordinate(feature, coordinate) {
+                    var ring = feature.getGeometry().getCoordinates()[0];
+                    var inside = false;
+                    for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                        var xi = ring[i][0];
+                        var yi = ring[i][1];
+                        var xj = ring[j][0];
+                        var yj = ring[j][1];
+                        var intersects = ((yi > coordinate[1]) !== (yj > coordinate[1])) && (coordinate[0] < (xj - xi) * (coordinate[1] - yi) / (yj - yi) + xi);
+                        if (intersects) { inside = !inside; }
+                    }
+                    return inside;
+                }
+
+                function nearestClassEntry(entries, rgb) {
+                    var best = null;
+                    var bestDistance = Infinity;
+                    entries.forEach(function(entry) {
+                        var distance = Math.pow(rgb[0] - entry.color[0], 2) + Math.pow(rgb[1] - entry.color[1], 2) + Math.pow(rgb[2] - entry.color[2], 2);
+                        if (distance < bestDistance) { bestDistance = distance; best = entry; }
+                    });
+                    return best;
+                }
+
+                function calculateClassAreas() {
+                    var info = getClassificationLayerInfo();
+                    var entries = getClassificationLegendEntries();
+                    if (!info || !entries.length || !selectedFeature) { return Promise.resolve([]); }
+                    return Promise.all(entries.map(sampleLegendColor)).then(function(classEntries) {
+                        return loadImage(info.url).then(function(image) {
+                            var canvas = document.createElement('canvas');
+                            canvas.width = image.naturalWidth || image.width;
+                            canvas.height = image.naturalHeight || image.height;
+                            var context = canvas.getContext('2d');
+                            context.drawImage(image, 0, 0);
+                            var imageData = context.getImageData(0, 0, canvas.width, canvas.height).data;
+                            var rasterExtent = info.extent;
+                            var featureExtent = selectedFeature.getGeometry().getExtent();
+                            var intersection = [
+                                Math.max(rasterExtent[0], featureExtent[0]),
+                                Math.max(rasterExtent[1], featureExtent[1]),
+                                Math.min(rasterExtent[2], featureExtent[2]),
+                                Math.min(rasterExtent[3], featureExtent[3])
+                            ];
+                            if (intersection[0] >= intersection[2] || intersection[1] >= intersection[3]) { return []; }
+                            var resX = (rasterExtent[2] - rasterExtent[0]) / canvas.width;
+                            var resY = (rasterExtent[3] - rasterExtent[1]) / canvas.height;
+                            var minX = Math.max(0, Math.floor((intersection[0] - rasterExtent[0]) / resX));
+                            var maxX = Math.min(canvas.width - 1, Math.ceil((intersection[2] - rasterExtent[0]) / resX));
+                            var minY = Math.max(0, Math.floor((rasterExtent[3] - intersection[3]) / resY));
+                            var maxY = Math.min(canvas.height - 1, Math.ceil((rasterExtent[3] - intersection[1]) / resY));
+                            var totalPixels = Math.max(1, (maxX - minX + 1) * (maxY - minY + 1));
+                            var step = Math.max(1, Math.ceil(Math.sqrt(totalPixels / 120000)));
+                            var centerLat = ol.proj.toLonLat(ol.extent.getCenter(intersection))[1];
+                            var pixelAreaHa = Math.abs(resX * resY) * Math.pow(Math.cos(centerLat * Math.PI / 180), 2) / 10000 * step * step;
+                            var areas = {};
+                            classEntries.forEach(function(entry) { areas[entry.label] = 0; });
+                            for (var py = minY; py <= maxY; py += step) {
+                                for (var px = minX; px <= maxX; px += step) {
+                                    var mapX = rasterExtent[0] + (px + 0.5) * resX;
+                                    var mapY = rasterExtent[3] - (py + 0.5) * resY;
+                                    if (!polygonContainsCoordinate(selectedFeature, [mapX, mapY])) { continue; }
+                                    var offset = (py * canvas.width + px) * 4;
+                                    if (imageData[offset + 3] < 20) { continue; }
+                                    var match = nearestClassEntry(classEntries, [imageData[offset], imageData[offset + 1], imageData[offset + 2]]);
+                                    if (match) { areas[match.label] += pixelAreaHa; }
+                                }
+                            }
+                            return classEntries.map(function(entry) {
+                                return { label: entry.label, hectares: areas[entry.label] || 0 };
+                            }).filter(function(row) { return row.hectares > 0.001; });
+                        });
+                    }).catch(function() { return []; });
+                }
+
+                function buildAreaRows(rows) {
+                    if (!rows.length) { return '<tr><td colspan="3">Superficies non disponibles pour cette zone.</td></tr>'; }
+                    var total = rows.reduce(function(sum, row) { return sum + row.hectares; }, 0);
+                    return rows.map(function(row) {
+                        var share = total ? (row.hectares / total * 100) : 0;
+                        return '<tr><td>' + escapeHtml(row.label) + '</td><td>' + row.hectares.toFixed(2) + '</td><td>' + share.toFixed(1) + ' %</td></tr>';
+                    }).join('') + '<tr><th>Total estimé</th><th>' + total.toFixed(2) + '</th><th>100 %</th></tr>';
+                }
+
+                function getScaleBar() {
+                    var size = map.getSize();
+                    var resolution = map.getView().getResolution();
+                    var center = ol.proj.toLonLat(map.getView().getCenter());
+                    var metersPerPixel = resolution * Math.cos(center[1] * Math.PI / 180);
+                    var rawMeters = metersPerPixel * 160;
+                    var power = Math.pow(10, Math.floor(Math.log10(rawMeters)));
+                    var fraction = rawMeters / power;
+                    var nice = (fraction < 2 ? 1 : fraction < 5 ? 2 : 5) * power;
+                    var widthPercent = Math.max(6, Math.min(35, nice / metersPerPixel / size[0] * 100));
+                    return { widthPercent: widthPercent, label: nice >= 1000 ? (nice / 1000).toFixed(nice >= 10000 ? 0 : 1) + ' km' : Math.round(nice) + ' m' };
+                }
+
+                async function openPrintLayout(imageUrl) {
                     var coords = getPolygonCoordinates(selectedFeature);
                     var extent = ol.proj.transformExtent(selectedFeature.getGeometry().getExtent(), map.getView().getProjection(), 'EPSG:4326');
                     var pointRows = coords.map(function(coord, index) {
                         return '<tr><td>' + (index + 1) + '</td><td>' + coord[0].toFixed(6) + '</td><td>' + coord[1].toFixed(6) + '</td></tr>';
                     }).join('');
+                    var areaRows = buildAreaRows(await calculateClassAreas());
+                    var legendHtml = buildLegendHtml(getPrintableLegends());
+                    var scale = getScaleBar();
                     var title = document.title || 'Carte de la zone sélectionnée';
                     var printed = window.open('', '_blank');
                     if (!printed) { setStatus('Autorisez les popups pour générer le PDF.'); return; }
-                    printed.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + title + '</title><style>body{font-family:Arial,sans-serif;margin:28px;color:#14241e}h1{margin:0 0 6px;font-size:22px}.meta{color:#65766f;margin:0 0 18px}.map{width:100%;border:1px solid #b8c8bf;border-radius:12px}table{width:100%;border-collapse:collapse;margin-top:16px;font-size:12px}td,th{border:1px solid #d8e2dc;padding:6px;text-align:right}th:first-child,td:first-child{text-align:left}.bbox{margin-top:12px;font-size:12px;color:#33443d}@page{size:A4 landscape;margin:12mm}@media print{body{margin:0}.map{max-height:128mm;object-fit:contain}}</style></head><body><h1>' + title + '</h1><p class="meta">Zone sélectionnée - ' + new Date().toLocaleString('fr-FR') + '</p><img class="map" src="' + imageUrl + '" alt="Carte de la zone sélectionnée"><p class="bbox">Emprise: Ouest ' + extent[0].toFixed(6) + ', Sud ' + extent[1].toFixed(6) + ', Est ' + extent[2].toFixed(6) + ', Nord ' + extent[3].toFixed(6) + '</p><table><thead><tr><th>Point</th><th>Longitude</th><th>Latitude</th></tr></thead><tbody>' + pointRows + '</tbody></table><script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
+                    printed.document.write('<!doctype html><html><head><meta charset="utf-8"><title>' + title + '</title><style>body{font-family:Arial,sans-serif;margin:24px;color:#14241e}h1{margin:0 0 6px;font-size:22px}h2{margin:14px 0 8px;font-size:14px}.meta{color:#65766f;margin:0 0 14px}.map-wrap{position:relative;border:1px solid #b8c8bf;border-radius:12px;overflow:hidden}.map{display:block;width:100%}.north{position:absolute;top:12px;right:12px;width:42px;height:42px;border-radius:50%;background:rgba(255,255,255,.9);display:grid;place-items:center;font-weight:900}.north:before{content:"▲";display:block;color:#0d3c29;line-height:1}.north span{position:absolute;bottom:5px;font-size:10px}.scale{position:absolute;left:18px;bottom:18px;height:22px;border-left:2px solid #14241e;border-right:2px solid #14241e;border-bottom:4px solid #14241e;background:rgba(255,255,255,.8);text-align:center;font-size:11px;font-weight:700}.scale b{position:relative;top:4px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.legend-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px}.legend-item{display:flex;align-items:center;gap:6px;font-size:11px}.legend-item img{width:14px;height:14px;object-fit:contain}table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px}td,th{border:1px solid #d8e2dc;padding:5px;text-align:right}th:first-child,td:first-child{text-align:left}.bbox{margin-top:10px;font-size:11px;color:#33443d}@page{size:A4 landscape;margin:12mm}@media print{body{margin:0}.map{max-height:126mm;object-fit:contain}}</style></head><body><h1>' + title + '</h1><p class="meta">Zone sélectionnée - ' + new Date().toLocaleString('fr-FR') + '</p><div class="grid"><main><div class="map-wrap"><img class="map" src="' + imageUrl + '" alt="Carte de la zone sélectionnée"><div class="north"><span>N</span></div><div class="scale" style="width:' + scale.widthPercent + '%"><b>' + scale.label + '</b></div></div><p class="bbox">Emprise: Ouest ' + extent[0].toFixed(6) + ', Sud ' + extent[1].toFixed(6) + ', Est ' + extent[2].toFixed(6) + ', Nord ' + extent[3].toFixed(6) + '</p><h2>Superficies estimées dans la zone</h2><table><thead><tr><th>Classe</th><th>Surface ha</th><th>Part</th></tr></thead><tbody>' + areaRows + '</tbody></table></main><aside>' + legendHtml + '<h2>Points du polygone</h2><table><thead><tr><th>Point</th><th>Longitude</th><th>Latitude</th></tr></thead><tbody>' + pointRows + '</tbody></table></aside></div><script>window.onload=function(){setTimeout(function(){window.print()},250)}<\/script></body></html>');
                     printed.document.close();
                     setStatus('Mise en page PDF ouverte. Choisissez Enregistrer en PDF dans la fenêtre d’impression.');
                 }
