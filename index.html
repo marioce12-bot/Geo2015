@@ -910,12 +910,13 @@
         }
 
         .coordinate-readout {
-            position: fixed;
+            position: absolute;
             left: 50%;
-            bottom: max(12px, env(safe-area-inset-bottom));
-            z-index: 1200;
+            bottom: 18px;
+            z-index: 30;
             display: block !important;
             transform: translateX(-50%);
+            max-width: calc(100% - 32px);
             padding: 7px 12px;
             border: 1px solid rgba(31, 111, 74, 0.18);
             border-radius: 999px;
@@ -923,6 +924,8 @@
             box-shadow: 0 12px 28px rgba(20, 40, 34, 0.16);
             color: var(--green-dark);
             pointer-events: none;
+            text-align: center;
+            white-space: nowrap;
             backdrop-filter: blur(12px);
         }
 
@@ -985,7 +988,6 @@
                             <button class="base-toggle active" id="base-osm" type="button">OSM</button>
                             <button class="base-toggle" id="base-satellite" type="button">Satellite</button>
                         </div>
-                        <div class="coordinate-readout" id="coordinate-readout">Lon: --, Lat: --</div>
                         <div class="tool-status" id="place-search-status" aria-live="polite">Saisissez un lieu pour centrer la carte.</div>
                     </section>
 </header>
@@ -1076,6 +1078,7 @@
                                 <div id="popup-content"></div>
                             </div>
                         </div>
+                        <div class="coordinate-readout" id="coordinate-readout">Lon: --, Lat: --</div>
                     </div>
                 </section>
             </main>
