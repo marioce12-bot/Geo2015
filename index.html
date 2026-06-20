@@ -1081,10 +1081,10 @@
                             <a class="year-link" data-card-key="occupation2025" href="https://marioce12-bot.github.io/2025/">2025</a>
                         </div>
                         <div class="section-switcher" aria-label="Ouvrir une autre section cartographique">
-                            <a class="section-link" data-card-key="changements" href="https://g-o-mangro.vercel.app/cartes#carte-changements">Changements</a>
+                            <a class="section-link" data-card-key="changements" href="https://g-o-mangro.vercel.app/changements">Changements</a>
                             <a class="section-link" data-card-key="prediction2040" href="https://g-o-mangro.vercel.app/predictions">Prédiction 2040</a>
-                            <a class="section-link" data-card-key="erosion" href="https://g-o-mangro.vercel.app/cartes#carte-erosion">Érosion</a>
-                            <a class="section-link" data-card-key="submersion" href="https://g-o-mangro.vercel.app/cartes#carte-submersion">Submersion</a>
+                            <a class="section-link" data-card-key="erosion" href="https://g-o-mangro.vercel.app/erosion">Érosion</a>
+                            <a class="section-link" data-card-key="submersion" href="https://g-o-mangro.vercel.app/submersion">Submersion</a>
                         </div>
                         <form class="place-search" id="place-search" aria-label="Rechercher un lieu">
                             <input id="place-search-input" name="q" type="search" placeholder="Ville, pays ou lieu" autocomplete="off">
@@ -1221,7 +1221,14 @@
                 if (!response.ok) { return; }
                 var data = await response.json();
                 var links = (((data.fields || {}).cardLinks || {}).mapValue || {}).fields || {};
+                var internalSectionLinks = {
+                    changements: 'https://g-o-mangro.vercel.app/changements',
+                    prediction2040: 'https://g-o-mangro.vercel.app/predictions',
+                    erosion: 'https://g-o-mangro.vercel.app/erosion',
+                    submersion: 'https://g-o-mangro.vercel.app/submersion'
+                };
                 document.querySelectorAll('[data-card-key]').forEach(function(link) {
+                    if (internalSectionLinks[link.dataset.cardKey]) { link.href = internalSectionLinks[link.dataset.cardKey]; return; }
                     var configured = links[link.dataset.cardKey] && links[link.dataset.cardKey].stringValue;
                     if (typeof configured === 'string' && configured.trim()) { link.href = configured.trim(); }
                 });
